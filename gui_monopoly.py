@@ -397,27 +397,21 @@ class Monopoly(QWidget):
         tile_pos = tile.get_pos()
         tile_real_pos = self.board.board_positions[tile_pos]
 
-        if passed_start:
-            start_tile = self.board.get_tile("Start")
-            start_tile_real_pos = self.board.board_positions[start_tile.get_pos()]
-            start_money = mp_core.SPECIAL_CASES[start_tile_real_pos][start_tile.get_name()]
-            self.current_player.receive(start_money)
-            message = f"You earned {start_money} after passig through the Start tile"
-            self.popup(message)
-
         if tile_real_pos in mp_core.PROPERTIES:
             if tile.is_owned():
                 owner = tile.get_owner()
-                rent = mp_core.PROPERTIES[tile_real_pos][tile_name]["Rent"]
-                self.current_player.pay(rent)
-                owner.receive(rent)
-                message = f"""
-                    You have landed on {owner}'s property
-                    You have to pay {rent}
-                    {self.current_player} now have {self.current_player.get_balance()}
-                    {owner} now have {owner.get_balance()}
-                """
-                self.popup(message)
+
+                if owner != self.current_player:
+                    rent = mp_core.PROPERTIES[tile_real_pos][tile_name]["Rent"]
+                    self.current_player.pay(rent)
+                    owner.receive(rent)
+                    message = f"""
+                        You have landed on {owner}'s property
+                        You have to pay {rent}
+                        {self.current_player} now have {self.current_player.get_balance()}
+                        {owner} now have {owner.get_balance()}
+                    """
+                    self.popup(message)
 
             else:
                 price = mp_core.PROPERTIES[tile_real_pos][tile_name]["Price"]
@@ -443,18 +437,20 @@ class Monopoly(QWidget):
             if tile_name == "Start":
                 self.current_player.receive(tile_value * 2)
                 message = f"You receive {tile_value * 2} {suffix_message}"
+                passed_start = False
                 self.popup(message)
             elif tile_name in ["Income Tax", "Super Tax"]:
                 self.current_player.pay(tile_value)
-                mp_core.FREE_PARKING += tile_value
+                self.board.free_parking += tile_value
                 message = f"You pay {tile_value} {suffix_message}"
                 self.popup(message)
             elif tile_name == "Go to jail":
                 self.send_player_to_jail()
+                passed_start = False
             elif tile_name == "Free Parking":
-                self.current_player.receive(mp_core.FREE_PARKING)
-                mp_core.FREE_PARKING = 0
-                message = f"You receive {mp_core.FREE_PARKING} {suffix_message}"
+                self.current_player.receive(self.board.free_parking)
+                message = f"You receive {self.board.free_parking} {suffix_message}"
+                self.board.free_parking = 0
                 self.popup(message)
 
         elif (tile_real_pos in mp_core.CHANCES or 
@@ -462,11 +458,19 @@ class Monopoly(QWidget):
         ):
             pass
 
+        if passed_start:
+            start_tile = self.board.get_tile("Start")
+            start_tile_real_pos = self.board.board_positions[start_tile.get_pos()]
+            start_money = mp_core.SPECIAL_CASES[start_tile_real_pos][start_tile.get_name()]
+            self.current_player.receive(start_money)
+            message = f"You earned {start_money} after passing through the Start tile"
+            self.popup(message)
 
 
 class Board(QGraphicsWidget):
     def __init__(self, players):
         super().__init__()
+        self.free_parking = 0
         self.total_tokens = []
 
         for player in players:

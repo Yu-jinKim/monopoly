@@ -37,7 +37,7 @@ SPECIAL_CASES = {
     4: {"Income Tax": 200},
     10: {"Visit Jail": None},
     20: {"Free Parking": None},
-    30: {"Go to jail": None},
+    30: {"Go to Jail": None},
     38: {"Super Tax": 100}
 }
 

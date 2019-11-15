@@ -349,19 +349,19 @@ class Monopoly(QWidget):
 
         # get the new tile according to the position of current player
         current_tile = self.board.get_tile_current_player(self.current_player)
-        current_real_pos = self.board.board_positions[current_tile.get_pos()]
-        new_real_pos = current_real_pos + sum_dice
+        current_board_pos = current_tile.get_board_pos()
+        new_board_pos = current_board_pos + sum_dice
 
         # if player gets passed last position of the board
         # "reset" the number to loop through the board
-        if new_real_pos >= 40:
-            new_real_pos -= 40
+        if new_board_pos >= 40:
+            new_board_pos -= 40
             passed_start = True
 
         # use the real position to get the fake position
         new_fake_pos = list(
             self.board.board_positions.keys()
-        )[list(self.board.board_positions.values()).index(new_real_pos)]
+        )[list(self.board.board_positions.values()).index(new_board_pos)]
         # use the fake position to get the new tile
         new_tile = self.board.get_tile(tile_pos = new_fake_pos)
 
@@ -394,34 +394,49 @@ class Monopoly(QWidget):
         """
 
         tile_name = tile.get_name()
-        tile_pos = tile.get_pos()
-        tile_real_pos = self.board.board_positions[tile_pos]
+        tile_board_pos = tile.get_board_pos()
 
-        if tile_real_pos in mp_core.PROPERTIES:
+        if passed_start and tile_name not in ["Start", "Go to Jail"]:
+            start_tile = self.board.get_tile("Start")
+            start_money = start_tile.get_price()
+            self.current_player.receive(start_money)
+            message = f"You earned {start_money} after passing through the Start tile"
+            self.popup(message)
+
+        if tile_board_pos in mp_core.PROPERTIES:
             if tile.is_owned():
                 owner = tile.get_owner()
 
                 if owner != self.current_player:
-                    rent = mp_core.PROPERTIES[tile_real_pos][tile_name]["Rent"]
-                    self.current_player.pay(rent)
-                    owner.receive(rent)
-                    message = f"""
-                        You have landed on {owner}'s property
-                        You have to pay {rent}
-                        {self.current_player} now have {self.current_player.get_balance()}
-                        {owner} now have {owner.get_balance()}
-                    """
-                    self.popup(message)
+                    rent = tile.get_rent()
+
+                    if self.current_player.get_balance() < rent:
+                        pass
+                    else:
+                        self.current_player.pay(rent)
+                        owner.receive(rent)
+                        message = f"""
+                            You have landed on {owner}'s property
+                            You have to pay {rent}
+                            {self.current_player} now have {self.current_player.get_balance()}
+                            {owner} now have {owner.get_balance()}
+                        """
+                        self.popup(message)
 
             else:
-                price = mp_core.PROPERTIES[tile_real_pos][tile_name]["Price"]
+                price = tile.get_price()
                 player_balance = self.current_player.get_balance()
 
                 if player_balance < price:
                     message = f"You don't have enough money to buy {tile_name} ({price})"
                     self.popup(message)
                 else:    
-                    buy = self.ask.question(self, "", f"Buy {tile_name} for {price}?", self.ask.Yes | self.ask.No)
+                    buy = self.ask.question(
+                        self,
+                        "",
+                        f"Buy {tile_name} for {price}?",
+                        self.ask.Yes | self.ask.No
+                    )
                     self.ask.exec_()
                     
                     if buy == self.ask.Yes:
@@ -430,41 +445,35 @@ class Monopoly(QWidget):
                         message = f"You now have {tile_name} and {self.current_player.get_balance()}"
                         self.popup(message)
         
-        elif tile_real_pos in mp_core.SPECIAL_CASES:
-            tile_value = mp_core.SPECIAL_CASES[tile_real_pos][tile_name]
+        elif tile_board_pos in mp_core.SPECIAL_CASES:
+            tile_value = tile.get_price()
             suffix_message = f"for landing on {tile_name}"
             
             if tile_name == "Start":
                 self.current_player.receive(tile_value * 2)
                 message = f"You receive {tile_value * 2} {suffix_message}"
-                passed_start = False
                 self.popup(message)
+
             elif tile_name in ["Income Tax", "Super Tax"]:
-                self.current_player.pay(tile_value)
-                self.board.free_parking += tile_value
-                message = f"You pay {tile_value} {suffix_message}"
-                self.popup(message)
-            elif tile_name == "Go to jail":
+                if self.current_player.get_balance() < tile_value:
+                    self.current_player.pay(tile_value)
+                    self.board.free_parking += tile_value
+                    message = f"You pay {tile_value} {suffix_message}"
+                    self.popup(message)
+                else:
+                    pass
+
+            elif tile_name == "Go to Jail":
                 self.send_player_to_jail()
-                passed_start = False
+
             elif tile_name == "Free Parking":
                 self.current_player.receive(self.board.free_parking)
                 message = f"You receive {self.board.free_parking} {suffix_message}"
                 self.board.free_parking = 0
                 self.popup(message)
 
-        elif (tile_real_pos in mp_core.CHANCES or 
-              tile_real_pos in mp_core.COMMUNITY_CHESTS
-        ):
+        elif tile_name == "Chance" or tile_name == "Community Chest":
             pass
-
-        if passed_start:
-            start_tile = self.board.get_tile("Start")
-            start_tile_real_pos = self.board.board_positions[start_tile.get_pos()]
-            start_money = mp_core.SPECIAL_CASES[start_tile_real_pos][start_tile.get_name()]
-            self.current_player.receive(start_money)
-            message = f"You earned {start_money} after passing through the Start tile"
-            self.popup(message)
 
 
 class Board(QGraphicsWidget):
@@ -512,16 +521,44 @@ class Board(QGraphicsWidget):
             if name == "":
                 continue
             
-            self.board_layout.addItem(Tile(name, grid2pos(position), players, parent=self), *position)
+            fake_pos = grid2pos(position)
+            board_pos = self.board_positions[fake_pos]
+            
+            if board_pos in mp_core.PROPERTIES:
+                price = mp_core.PROPERTIES[board_pos][name]["Price"]
+                rent = mp_core.PROPERTIES[board_pos][name]["Rent"]
+                mortgage = price / 2
+            
+            elif board_pos in mp_core.SPECIAL_CASES:
+                price = mp_core.SPECIAL_CASES[board_pos][name]
+                rent, mortgage = None, None
+
+            elif board_pos in mp_core.CHANCES or board_pos in mp_core.COMMUNITY_CHESTS:
+                price, rent, mortgage = None, None, None
+
+            self.board_layout.addItem(
+                Tile(
+                    name,
+                    fake_pos,
+                    board_pos,
+                    price,
+                    rent,
+                    mortgage,
+                    players,
+                    parent=self
+                    ),
+                *position
+            )
 
         self.setLayout(self.board_layout)
 
     def get_tile_current_player(self, current_player):
         for i in range(0, 40):
             tile = self.board_layout.itemAt(i)
-            tokens = tile.has_tokens()
 
-            if tokens:
+            if tile.has_tokens():
+                tokens = tile.get_all_tokens()
+
                 for token in tokens:
                     player = token.get_player()
 
@@ -537,15 +574,21 @@ class Board(QGraphicsWidget):
             if tile_name == tile.get_name():
                 return tile
 
-            if tile_pos == tile.get_pos():
+            if tile_pos == tile.get_fake_pos():
                 return tile
 
 
 class Tile(QGraphicsWidget):
-    def __init__(self, name, position, players, parent):
+    def __init__(self, name, fake_pos, board_pos,
+                 price, rent, mortgage, players, parent
+    ):
         super().__init__(parent=parent)
         self.name = name
-        self.position = position
+        self.fake_pos = fake_pos
+        self.board_pos = board_pos
+        self.price = price
+        self.rent =  rent
+        self.mortgage = mortgage
         self.tokens = []
         self.owner = False
 
@@ -562,29 +605,22 @@ class Tile(QGraphicsWidget):
         property_name = QGraphicsTextItem(self.name, parent=self.name_on_tile)
         
         if name in parent.properties:
-            self.real_pos = parent.board_positions[parent.properties.index(name)]
-
-            if self.real_pos in mp_core.PROPERTIES:
-                self.price = mp_core.PROPERTIES[self.real_pos][name]["Price"]
-                self.rent = mp_core.PROPERTIES[self.real_pos][name]["Rent"]
+            if self.board_pos in mp_core.PROPERTIES:
                 money_info = QGraphicsTextItem(f"Price: {self.price}", parent=self.info)
 
-            elif self.real_pos in mp_core.SPECIAL_CASES:
-                tile = list(mp_core.SPECIAL_CASES[self.real_pos].keys())[0]
-
-                if tile == "Start":
-                    money_start = QGraphicsTextItem("Free monay: 200", parent=self.info)
+            elif self.board_pos in mp_core.SPECIAL_CASES:
+                if name == "Start":
+                    money_start = QGraphicsTextItem(f"Free monay: {self.price}", parent=self.info)
 
                     for player in players:
                         token = Token(player)
-                        token.set_tile(tile)
+                        token.set_tile(self)
                         self.tokens.append(token)
 
                     self.display_game_pieces()
 
-                elif tile in ["Income Tax", "Super Tax"]:
-                    money = mp_core.SPECIAL_CASES[self.real_pos][tile]
-                    money_tax = QGraphicsTextItem(f"Tax: -{money}", parent=self.info)
+                elif name in ["Income Tax", "Super Tax"]:
+                    money_tax = QGraphicsTextItem(f"Tax: -{self.price}", parent=self.info)
 
         self.layout.addItem(self.name_on_tile)
         self.layout.addItem(self.info)
@@ -611,11 +647,42 @@ class Tile(QGraphicsWidget):
     def remove_token(self, token):
         self.tokens.remove(token)
 
+    def remove_token_layout(self, token):
+        self.token_layout.removeItem(token)
+
     def get_name(self):
         return self.name
 
-    def get_pos(self):
-        return self.position
+    def get_fake_pos(self):
+        return self.fake_pos
+
+    def get_board_pos(self):
+        return self.board_pos
+
+    def get_token(self, player):
+        for token in self.tokens:
+            if player == token.get_player():
+                return token
+
+        return
+
+    def get_all_tokens(self):
+        return self.tokens
+
+    def get_price(self):
+        return self.price
+
+    def get_rent(self):
+        return self.rent
+    
+    def get_mortgage(self):
+        return self.mortgage
+
+    def has_tokens(self):
+        if self.tokens != []:
+            return True
+        else:
+            return False
 
     def display_game_pieces(self):
         if len(self.tokens) == 6 or len(self.tokens) == 5 or len(self.tokens) == 4:
@@ -636,24 +703,11 @@ class Tile(QGraphicsWidget):
 
         return self.token_layout
 
+
+
     def paint(self, painter, option, widget):
         painter.drawRects(self.boundingRect())
 
-    def has_tokens(self):
-        if self.tokens != []:
-            return self.tokens
-        else:
-            return
-
-    def get_token(self, player):
-        for token in self.tokens:
-            if player == token.get_player():
-                return token
-
-        return
-
-    def remove_token_layout(self, token):
-        self.token_layout.removeItem(token)
 
 
 class Token(QGraphicsWidget):

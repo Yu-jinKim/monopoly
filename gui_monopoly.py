@@ -6,6 +6,7 @@ GUI done in PyQt5 using monopoly_core.py
 import argparse
 import sys
 import time
+from functools import partial
 from PyQt5.QtWidgets import (
     QLineEdit,
     QWidget,
@@ -16,6 +17,7 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QCheckBox,
     QDialog,
+    QColorDialog,
     QPushButton,
     QStackedWidget,
     QVBoxLayout,
@@ -31,7 +33,7 @@ from PyQt5.QtWidgets import (
     QGraphicsEllipseItem,
 )
 from PyQt5.QtCore import Qt
-from PyQt5 import QtGui
+from PyQt5.QtGui import QFont, QBrush, QColor
 import monopoly_core as mp_core
 
 
@@ -79,9 +81,17 @@ class MainWindow(QMainWindow):
     def create_players(self):
         """ check the names fields, open the game screen """
 
-        players = []
+        players = {}
 
-        for player in self.names_screen.player_names:
+        if self.names_screen.player_colors == []:
+            for i in range(len(self.names_screen.player_names)):
+                self.names_screen.player_colors.append("#000000")
+
+
+        for player, color in zip(
+            self.names_screen.player_names,
+            self.names_screen.player_colors
+        ):
             name = player.text().strip()
 
             if name == "":
@@ -90,7 +100,7 @@ class MainWindow(QMainWindow):
                 error.exec_()
                 return
 
-            players.append(mp_core.Player(name))
+            players[mp_core.Player(name)] = color
 
         self.game = Monopoly(players, self.debug)
         self.central_widget.addWidget(self.game)
@@ -131,17 +141,25 @@ class NamesPlayers(QWidget):
         super().__init__()
 
         self.player_names = []
+        self.player_colors = []
 
         main_layout = QVBoxLayout()
         names_layout = QGridLayout()
         button_layout = QHBoxLayout()
 
+        button_list = []
+
         for i in range(nb_players):
             label = QLabel("Name :")
             player_name = QLineEdit()
+            color_button = QPushButton("Color")
+            color_button.setStyleSheet("background-color: white")
             names_layout.addWidget(label, i, 0)
             names_layout.addWidget(player_name, i, 1)
+            names_layout.addWidget(color_button, i, 2)
+            button_list.append(color_button)
             self.player_names.append(player_name)
+            color_button.clicked.connect(partial(self.open_colordialog, color_button))
 
         self.confirm_button = QPushButton("Confirm")
 
@@ -152,6 +170,15 @@ class NamesPlayers(QWidget):
 
         self.setLayout(main_layout)
 
+    def open_colordialog(self, button):
+        color_dialog = QColorDialog()
+        if color_dialog.exec_() == QColorDialog.Accepted:
+            button.setStyleSheet(
+                "background-color: {}".format(color_dialog.selectedColor().name())
+            )
+        button.clearFocus()
+        self.player_colors.append(color_dialog.selectedColor().name())
+
 
 class Monopoly(QWidget):
     """ actual game, display the board and everything """
@@ -159,7 +186,8 @@ class Monopoly(QWidget):
     def __init__(self, players, debug = False):
         super().__init__()
 
-        self.players = players
+        self.players = list(players.keys())
+        self.player2color = players
         self.die1 = None
         self.die2 = None
         self.sum_dice = None
@@ -174,7 +202,7 @@ class Monopoly(QWidget):
         self.message_box = QMessageBox()
         self.ask = QMessageBox()
 
-        if len(players) > 1:
+        if len(self.players) > 1:
             self.ordered_players = self.order_players()
         else:
             self.ordered_players = self.players
@@ -192,7 +220,7 @@ class Monopoly(QWidget):
 
         self.view = QGraphicsView()
         self.scene = QGraphicsScene()
-        self.board = Board(self.players)
+        self.board = Board(self.player2color)
         self.board.setParent(self)
         self.scene.addItem(self.board)
         self.view.setScene(self.scene)
@@ -244,7 +272,10 @@ class Monopoly(QWidget):
 
     def update_turn(self):
         self.turn_label.setText(f"Turn of {self.current_player}")
-        self.turn_label.setFont(QtGui.QFont("Comic Sans MS", 20, QtGui.QFont.Bold))
+        self.turn_label.setStyleSheet(
+            f"background-color: {self.player2color[self.current_player]}"
+        )
+        self.turn_label.setFont(QFont("Comic Sans MS", 20, QFont.Bold))
 
     def update_balance(self):
         self.balance_info.setText("Money left:")
@@ -675,8 +706,8 @@ class Board(QGraphicsWidget):
         self.free_parking = 0
         self.total_tokens = []
 
-        for player in players:
-            self.total_tokens.append(Token(player))
+        for player, color in players.items():
+            self.total_tokens.append(Token(player, color))
 
         self.board_layout = QGraphicsGridLayout()
         self.board_layout.setSpacing(0)
@@ -805,8 +836,8 @@ class Tile(QGraphicsWidget):
                 if name == "Start":
                     money_start = QGraphicsTextItem(f"Free monay: {self.price}", parent=self.info)
 
-                    for player in players:
-                        token = Token(player)
+                    for player, color in players.items():
+                        token = Token(player, color)
                         token.set_tile(self)
                         self.tokens.append(token)
 
@@ -905,12 +936,12 @@ class Tile(QGraphicsWidget):
         painter.drawRects(self.boundingRect())
 
 
-
 class Token(QGraphicsWidget):
-    def __init__(self, player):
+    def __init__(self, player, color):
         super().__init__()
         self.player = player
         self.token = QGraphicsEllipseItem(0, 0, 20, 20, parent = self)
+        self.fill_token(color)
 
     def get_current_tile(self):
         return self.current_tile
@@ -920,6 +951,14 @@ class Token(QGraphicsWidget):
 
     def get_player(self):
         return self.player
+
+    def fill_token(self, color = Qt.white):
+        set_color = QColor(0, 0, 0)
+        set_color.setNamedColor(color)
+
+        self.token.setBrush(QBrush(
+            set_color, style = Qt.SolidPattern
+        ))
 
 
 def grid2pos(values):
@@ -940,6 +979,7 @@ if __name__ == "__main__":
 
     reboot_code = MainWindow.EXIT_CODE_REBOOT
 
+    # trick to get to restart the app when the game is over
     while reboot_code == MainWindow.EXIT_CODE_REBOOT:
         app = QApplication(sys.argv)
 

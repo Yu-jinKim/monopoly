@@ -38,7 +38,9 @@ import monopoly_core as mp_core
 class MainWindow(QMainWindow):
     """ main window where i display the various widgets """
 
-    def __init__(self, debug):
+    EXIT_CODE_REBOOT = 100
+
+    def __init__(self, debug = False):
         super().__init__()
 
         self.debug = debug
@@ -350,7 +352,7 @@ class Monopoly(QWidget):
                 self.update_interface()
 
         if len(self.ordered_players) == 1:
-            print(f"{self.ordered_players[0]} won")
+            self.end_game(self.ordered_players[0])
 
     def roll(self):
         """ roll and get new position """
@@ -573,8 +575,8 @@ class Monopoly(QWidget):
 
         self.mortgaging_window = QDialog()
 
-        self.main_layout = QVBoxLayout()
-        self.groupbox_layout = QVBoxLayout()
+        main_layout = QVBoxLayout()
+        groupbox_layout = QVBoxLayout()
         button_layout = QHBoxLayout()
 
         self.mortgage_options = QGroupBox()
@@ -582,15 +584,15 @@ class Monopoly(QWidget):
 
         for prop in properties:
             box = QCheckBox(f"{prop.get_name()}-{prop.get_mortgage()}")
-            self.groupbox_layout.addWidget(box)
+            groupbox_layout.addWidget(box)
 
         button_layout.addWidget(button)
-        self.mortgage_options.setLayout(self.groupbox_layout)
+        self.mortgage_options.setLayout(groupbox_layout)
 
-        self.main_layout.addWidget(self.mortgage_options)
-        self.main_layout.addLayout(button_layout)
+        main_layout.addWidget(self.mortgage_options)
+        main_layout.addLayout(button_layout)
 
-        self.mortgaging_window.setLayout(self.main_layout)
+        self.mortgaging_window.setLayout(main_layout)
 
         button.clicked.connect(self.mortgage_clicked)
 
@@ -602,7 +604,7 @@ class Monopoly(QWidget):
         Check if the sum is enough to pay the sum due
         Remove the properties from the player
         """
-        
+
         boxes = self.mortgage_options.findChildren(QCheckBox)
         mortgage_money = 0
 
@@ -633,6 +635,39 @@ class Monopoly(QWidget):
         tile.remove_token(token)
         tile.remove_token_layout(token)
 
+    def end_game(self, winner):
+        self.end_window = QDialog()
+        main_layout = QVBoxLayout()
+        button_layout = QHBoxLayout()
+
+        message = QLabel(
+            f"""
+                Game over:
+                {winner} has won !
+
+                Replay a game?
+            """)
+        
+        no_button = QPushButton("No")
+        yes_button = QPushButton("Yes")
+
+        button_layout.addWidget(no_button)
+        button_layout.addWidget(yes_button)
+        
+        main_layout.addWidget(message)
+        main_layout.addLayout(button_layout)
+        self.end_window.setLayout(main_layout)
+
+        no_button.clicked.connect(self.exit_game)
+        yes_button.clicked.connect(self.restart)
+
+        self.end_window.exec_()
+
+    def restart(self):
+        QApplication.exit(self.parent().parent().EXIT_CODE_REBOOT)
+
+    def exit_game(self):
+        QApplication.exit(-1)
 
 class Board(QGraphicsWidget):
     def __init__(self, players):
@@ -893,18 +928,23 @@ def grid2pos(values):
     return pos
 
 
+def main():
+    pass
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--debug", default = False, action="store_true")
 
     args = parser.parse_args()
 
-    app = QApplication(sys.argv)
+    reboot_code = MainWindow.EXIT_CODE_REBOOT
 
-    window = MainWindow(args.debug)
-    window.show()
+    while reboot_code == MainWindow.EXIT_CODE_REBOOT:
+        app = QApplication(sys.argv)
 
-    app.exec_()
+        window = MainWindow(args.debug)
+        window.show()
 
-
-
+        reboot_code = app.exec_()
+        app = None

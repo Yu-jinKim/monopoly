@@ -3,7 +3,7 @@
 GUI done in PyQt5 using monopoly_core.py
 """
 
-
+import argparse
 import sys
 import time
 from PyQt5.QtWidgets import (
@@ -13,6 +13,9 @@ from PyQt5.QtWidgets import (
     QLabel,
     QMainWindow,
     QGridLayout,
+    QGroupBox,
+    QCheckBox,
+    QDialog,
     QPushButton,
     QStackedWidget,
     QVBoxLayout,
@@ -35,9 +38,10 @@ import monopoly_core as mp_core
 class MainWindow(QMainWindow):
     """ main window where i display the various widgets """
 
-    def __init__(self):
+    def __init__(self, debug):
         super().__init__()
 
+        self.debug = debug
         self.setWindowTitle("Monopoly")
         self.central_widget = QStackedWidget()
 
@@ -76,7 +80,7 @@ class MainWindow(QMainWindow):
         players = []
 
         for player in self.names_screen.player_names:
-            name = player.text()
+            name = player.text().strip()
 
             if name == "":
                 error = QErrorMessage()
@@ -86,7 +90,7 @@ class MainWindow(QMainWindow):
 
             players.append(mp_core.Player(name))
 
-        self.game = Monopoly(players)
+        self.game = Monopoly(players, self.debug)
         self.central_widget.addWidget(self.game)
         self.central_widget.setCurrentWidget(self.game)
 
@@ -150,10 +154,14 @@ class NamesPlayers(QWidget):
 class Monopoly(QWidget):
     """ actual game, display the board and everything """
 
-    def __init__(self, players):
+    def __init__(self, players, debug = False):
         super().__init__()
 
         self.players = players
+        self.die1 = None
+        self.die2 = None
+        self.sum_dice = None
+        self.debug = debug
 
         self.main_layout = QVBoxLayout()
         self.turn_layout = QHBoxLayout()
@@ -200,6 +208,10 @@ class Monopoly(QWidget):
         self.player_info_layout.addWidget(self.possessions_info, 1, 2, Qt.AlignCenter)
         self.player_info_layout.addWidget(self.possessions, 2, 2, Qt.AlignCenter)
         self.buttons_layout.addWidget(roll_button)
+        
+        if debug:
+            debug_button = QPushButton("Choose roll")
+            self.buttons_layout.addWidget(debug_button)
 
         self.main_layout.addLayout(self.turn_layout)
         self.main_layout.addLayout(self.board_layout)
@@ -209,6 +221,9 @@ class Monopoly(QWidget):
         self.setLayout(self.main_layout)
 
         roll_button.clicked.connect(self.play_turn)
+
+        if debug:
+            debug_button.clicked.connect(self.debug_roll)
 
     def player_generator(self):
         """ Generator for player turns """
@@ -234,7 +249,7 @@ class Monopoly(QWidget):
         self.balance.setText(f"{self.current_player.get_balance()}")
 
     def update_position(self):
-        tile = self.board.get_tile_current_player(self.current_player)
+        tile = self.board.get_player_tile(self.current_player)
 
         self.position_info.setText("Current position:")
         self.position.setText(f"{tile.get_name()}")
@@ -250,7 +265,7 @@ class Monopoly(QWidget):
         self.update_possessions()
 
     def order_players(self):
-        """ roll dices for players to order them """
+        """ roll dices for players and order them """
 
         rolls = []
 
@@ -258,7 +273,7 @@ class Monopoly(QWidget):
             rolls.append(sum(mp_core.roll()[0:2]))
 
         rolls_players = sorted(set(zip(rolls, self.players)), key=lambda x: -x[0])
-        ordered_players = [player[1] for player in rolls_players]
+        ordered_players = [player for roll, player in rolls_players]
 
         message = "Order of players:\n"
 
@@ -293,7 +308,7 @@ class Monopoly(QWidget):
 
         self.popup(message)
 
-    def play_turn(self, doubles = 0):
+    def play_turn(self, doubles = 0, debug = False):
         """ Play the turn 
         
         Roll dice
@@ -302,10 +317,14 @@ class Monopoly(QWidget):
         Check bankrupcy
         """
 
-        die1, die2, sum_dice = self.roll()
+        if not debug:
+            self.roll()
+
+        if not all((self.die1, self.die2, self.sum_dice)):
+            return
 
         if self.current_player.in_jail():
-            if die1 == die2:
+            if self.die1 == self.die2:
                 self.current_player.out_of_jail()
             else:
                 self.current_player.pass_turn()
@@ -313,10 +332,10 @@ class Monopoly(QWidget):
             self.pass_player_turn()
 
         else:
-            current_tile, passed_start = self.move_player(sum_dice)
+            current_tile, passed_start = self.move_player()
             self.interact_board(current_tile, passed_start)
 
-            if die1 == die2:
+            if self.die1 == self.die2:
                 doubles += 1
 
                 if doubles == 3:
@@ -330,14 +349,53 @@ class Monopoly(QWidget):
                 self.pass_player_turn()
                 self.update_interface()
 
+        if len(self.ordered_players) == 1:
+            print(f"{self.ordered_players[0]} won")
+
     def roll(self):
         """ roll and get new position """
 
-        die1, die2, sum_dice = mp_core.roll()
-        self.popup(f"{self.current_player} rolled {die1} and {die2}: {sum_dice}")
-        return die1, die2, sum_dice
+        self.die1, self.die2, self.sum_dice = mp_core.roll()
+        self.popup(f"{self.current_player} rolled {self.die1} and {self.die2}: {self.sum_dice}")
 
-    def move_player(self, sum_dice):
+    def debug_roll(self):
+        """ Window to choose which value you get for rolling 
+        Debug/testing thing
+        """
+
+        self.debug_window = QDialog()
+        main_layout = QVBoxLayout()
+        names_layout = QGridLayout()
+        button_layout = QHBoxLayout()
+
+        self.die1_debug = QLineEdit()
+        self.die2_debug = QLineEdit()
+        button = QPushButton("Confirm")
+
+        for i, die in enumerate([self.die1_debug, self.die2_debug]):
+            label = QLabel("Die value :")
+            names_layout.addWidget(label, i, 0)
+            names_layout.addWidget(die, i, 1)
+
+        button_layout.addWidget(button)
+        main_layout.addLayout(names_layout)
+        main_layout.addLayout(button_layout)
+        self.debug_window.setLayout(main_layout)
+        
+        button.clicked.connect(self.debug_clicked)
+
+        self.debug_window.exec_()
+
+    def debug_clicked(self):
+        """ Get the values typed and feed them to the play turn function """
+
+        self.die1 = int(self.die1_debug.text())
+        self.die2 = int(self.die2_debug.text())
+        self.sum_dice = self.die1 + self.die2
+        self.debug_window.done(0)
+        self.play_turn(debug = True)
+
+    def move_player(self):
         """ Move player on the board
 
         Get new position --> new tile
@@ -348,9 +406,9 @@ class Monopoly(QWidget):
         passed_start = False
 
         # get the new tile according to the position of current player
-        current_tile = self.board.get_tile_current_player(self.current_player)
+        current_tile = self.board.get_player_tile(self.current_player)
         current_board_pos = current_tile.get_board_pos()
-        new_board_pos = current_board_pos + sum_dice
+        new_board_pos = current_board_pos + self.sum_dice
 
         # if player gets passed last position of the board
         # "reset" the number to loop through the board
@@ -362,6 +420,7 @@ class Monopoly(QWidget):
         new_fake_pos = list(
             self.board.board_positions.keys()
         )[list(self.board.board_positions.values()).index(new_board_pos)]
+
         # use the fake position to get the new tile
         new_tile = self.board.get_tile(tile_pos = new_fake_pos)
 
@@ -376,8 +435,8 @@ class Monopoly(QWidget):
     def send_player_to_jail(self):
         """ Send the current player to jail """
 
-        current_tile = self.board.get_tile_current_player(self.current_player)
-        jail_tile = self.board.get_tile(tile_name = "Jail")
+        current_tile = self.board.get_player_tile(self.current_player)
+        jail_tile = self.board.get_tile(tile_name = "Go to Jail")
         
         self.update_token_position(
             current_tile,
@@ -410,18 +469,24 @@ class Monopoly(QWidget):
                 if owner != self.current_player:
                     rent = tile.get_rent()
 
-                    if self.current_player.get_balance() < rent:
-                        pass
-                    else:
-                        self.current_player.pay(rent)
-                        owner.receive(rent)
+                    if self.current_player.get_balance() >= rent:
+                        new_balance = self.current_player.pay(rent)
+                        owner_balance = owner.receive(rent)
                         message = f"""
                             You have landed on {owner}'s property
-                            You have to pay {rent}
-                            {self.current_player} now have {self.current_player.get_balance()}
-                            {owner} now have {owner.get_balance()}
+                            You have to pay {rent}:
+                             - {self.current_player} now have {new_balance}
+                             - {owner} now have {owner_balance}
                         """
                         self.popup(message)
+                    else:
+                        self.sum_to_pay = rent
+                        bankrupt = self.player_bankrupt()
+
+                        if bankrupt:
+                            self.player_lost()
+                        else:
+                            self.mortgaging()
 
             else:
                 price = tile.get_price()
@@ -455,13 +520,19 @@ class Monopoly(QWidget):
                 self.popup(message)
 
             elif tile_name in ["Income Tax", "Super Tax"]:
-                if self.current_player.get_balance() < tile_value:
+                if self.current_player.get_balance() >= tile_value:
                     self.current_player.pay(tile_value)
                     self.board.free_parking += tile_value
                     message = f"You pay {tile_value} {suffix_message}"
                     self.popup(message)
                 else:
-                    pass
+                    self.sum_to_pay = tile_value
+                    bankrupt = self.player_bankrupt()
+                    
+                    if bankrupt:
+                        self.player_lost()
+                    else:
+                        self.mortgaging()
 
             elif tile_name == "Go to Jail":
                 self.send_player_to_jail()
@@ -474,6 +545,93 @@ class Monopoly(QWidget):
 
         elif tile_name == "Chance" or tile_name == "Community Chest":
             pass
+
+    def player_bankrupt(self):
+        """ Check for player's real estate to see if bankrupt """
+        
+        real_estate = 0
+        player_properties_names = self.current_player.get_possessions()
+
+        for prop_name in player_properties_names:
+            prop_tile = self.board.get_tile(prop_name)
+            real_estate += prop_tile.get_mortgage()
+
+        if real_estate < self.sum_to_pay:
+            return True
+        else:
+            return False
+
+    def mortgaging(self):
+        """ Mortgaging properties to avoid bankrupcy """
+        
+        player_properties_names = self.current_player.get_possessions()
+        properties = []
+        self.chosen_mortgaged_properties = {}
+
+        for prop_name in player_properties_names:
+            properties.append(self.board.get_tile(prop_name))
+
+        self.mortgaging_window = QDialog()
+
+        self.main_layout = QVBoxLayout()
+        self.groupbox_layout = QVBoxLayout()
+        button_layout = QHBoxLayout()
+
+        self.mortgage_options = QGroupBox()
+        button = QPushButton("Mortgage")
+
+        for prop in properties:
+            box = QCheckBox(f"{prop.get_name()}-{prop.get_mortgage()}")
+            self.groupbox_layout.addWidget(box)
+
+        button_layout.addWidget(button)
+        self.mortgage_options.setLayout(self.groupbox_layout)
+
+        self.main_layout.addWidget(self.mortgage_options)
+        self.main_layout.addLayout(button_layout)
+
+        self.mortgaging_window.setLayout(self.main_layout)
+
+        button.clicked.connect(self.mortgage_clicked)
+
+        self.mortgaging_window.exec_()
+
+    def mortgage_clicked(self):
+        """
+        Propose properties for possible mortgages
+        Check if the sum is enough to pay the sum due
+        Remove the properties from the player
+        """
+        
+        boxes = self.mortgage_options.findChildren(QCheckBox)
+        mortgage_money = 0
+
+        for box in boxes:
+            if box.checkState() == 2:
+                name, mortgage_worth = box.text().split("-")
+                mortgage_money += int(float(mortgage_worth))
+                self.chosen_mortgaged_properties[name] = mortgage_worth
+
+        if mortgage_money >= self.sum_to_pay:
+            for name, worth in self.chosen_mortgaged_properties.items():
+                tile = self.board.get_tile(name)
+                self.current_player.remove_possession(name, int(float(worth)))
+                tile.remove_owner()
+                self.mortgaging_window.done(0)
+        else:
+            message = f"""
+                You didn't give enough properties to mortgage:
+                Properties worth {mortgage_money} vs sum to pay {self.sum_to_pay}
+            """
+            self.popup(message)
+
+    def player_lost(self):
+        self.popup(f"{self.current_player} lost")
+        self.ordered_players.remove(self.current_player)
+        tile = self.board.get_player_tile(self.current_player)
+        token = tile.get_token(self.current_player)
+        tile.remove_token(token)
+        tile.remove_token_layout(token)
 
 
 class Board(QGraphicsWidget):
@@ -552,7 +710,7 @@ class Board(QGraphicsWidget):
 
         self.setLayout(self.board_layout)
 
-    def get_tile_current_player(self, current_player):
+    def get_player_tile(self, current_player):
         for i in range(0, 40):
             tile = self.board_layout.itemAt(i)
 
@@ -641,6 +799,9 @@ class Tile(QGraphicsWidget):
     def get_owner(self):
         return self.owner
 
+    def remove_owner(self):
+        self.owner = False
+
     def add_token(self, token):
         self.tokens.append(token)
 
@@ -714,7 +875,7 @@ class Token(QGraphicsWidget):
     def __init__(self, player):
         super().__init__()
         self.player = player
-        self.token = QGraphicsEllipseItem(0, 0, 20, 20, parent=self)
+        self.token = QGraphicsEllipseItem(0, 0, 20, 20, parent = self)
 
     def get_current_tile(self):
         return self.current_tile
@@ -726,16 +887,21 @@ class Token(QGraphicsWidget):
         return self.player
 
 
-def grid2pos(values: list):
+def grid2pos(values):
     row, column = values
     pos = (row * 10) + row + column
     return pos
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--debug", default = False, action="store_true")
+
+    args = parser.parse_args()
+
     app = QApplication(sys.argv)
 
-    window = MainWindow()
+    window = MainWindow(args.debug)
     window.show()
 
     app.exec_()

@@ -8,6 +8,9 @@ class Player:
     def __str__(self):
         return self.name
 
+    def get_name(self):
+        return self.name
+
     def get_balance(self):
         return self.balance
 

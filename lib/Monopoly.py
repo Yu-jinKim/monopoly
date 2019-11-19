@@ -40,6 +40,7 @@ class Monopoly(QWidget):
         self.die1 = None
         self.die2 = None
         self.sum_dice = None
+        self.doubles = 0
         self.debug = debug
 
         self.main_layout = QVBoxLayout()
@@ -215,7 +216,7 @@ class Monopoly(QWidget):
 
         self.popup(message)
 
-    def play_turn(self, doubles = 0, debug = False):
+    def play_turn(self, debug = False):
         """ Play the turn 
         
         Roll dice
@@ -224,7 +225,6 @@ class Monopoly(QWidget):
         Update interface
 
         Args:
-            doubles: int
             debug: bool
         """
 
@@ -237,26 +237,35 @@ class Monopoly(QWidget):
         if self.current_player.in_jail():
             if self.die1 == self.die2:
                 self.current_player.out_of_jail()
+                self.popup("You're out of prison")
             else:
                 self.current_player.pass_turn()
+                
+                if self.current_player.in_jail() == 0:
+                    self.popup("You're out of prison")
+                else:
+                    self.popup(
+                        f"You have {self.current_player.in_jail()} turns left in jail"
+                    )
 
             self.pass_player_turn()
+            self.update_interface()
 
         else:
             current_tile, passed_start = self.move_player()
             self.interact_board(current_tile, passed_start)
 
             if self.die1 == self.die2:
-                doubles += 1
+                self.doubles += 1
 
-                if doubles == 3:
+                if self.doubles == 3:
                     self.send_player_to_jail()
                     self.pass_player_turn()
                     self.update_interface()
                 else:
                     self.update_interface()
-                    self.play_turn(doubles, debug)
             else:
+                self.doubles = 0
                 self.pass_player_turn()
                 self.update_interface()
 
@@ -347,12 +356,12 @@ class Monopoly(QWidget):
         """ Send the current player to jail """
 
         current_tile = self.board.get_player_tile(self.current_player)
-        jail_tile = self.board.get_tile(tile_name = "Go to Jail")
+        jail_tile = self.board.get_tile(tile_name = "Visit Jail")
         
         self.update_token_position(
             current_tile,
             jail_tile,
-            "You landed in jail"
+            "You got sent to jail"
         )
 
         self.current_player.go_to_jail()

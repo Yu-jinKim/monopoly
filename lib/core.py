@@ -1,5 +1,5 @@
+from typing import List, Tuple
 from random import randint
-import sys
 
 PROPERTIES = {
     1: {"Old Kent Road": {"Rent": 2, "Price": 60}},
@@ -47,86 +47,25 @@ COMMUNITY_CHESTS = [2, 17, 33]
 
 FREE_PARKING = 0
 
-
-class Player:
-    """ Object to represent players """
-    def __init__(self, name):
-        """ Setup the player """
-        self.name = name
-        self.balance = 1500
-        self.position = 0
-        self.possessions = []
-        self.jail_status = 0
-
-    def __str__(self):
-        return self.name
-
-    def get_status(self):
-        return (f"{self.name}:\n"
-                f"- Moneyz: {self.balance}\n"
-                f"- Position on the board: {self.position}\n"
-                f"- Possessions: {self.possessions}"
-                f"- In jail?: {self.jail_status}")
-
-    def get_balance(self):
-        return self.balance
-
-    def move(self, dice_amount):
-        """ Move the player (take into account the board is a circle)"""
-        self.position += dice_amount
-
-        if self.position >= 40:
-            self.position -= 40
-
-            if self.position == 0:
-                self.balance += 400
-            else:
-                self.balance += 200
-
-        return self.position
-
-    def get_possessions(self):
-        return self.possessions
-
-    def in_jail(self):
-        return self.jail_status
-
-    def add_possession(self, land, amount):
-        self.balance -= amount
-        self.possessions.append(land)
-
-    def remove_possession(self, land, amount):
-        self.balance += amount
-        self.possessions.remove(land)
-
-    def pay(self, amount):
-        self.balance -= amount
-        return self.balance
-
-    def receive(self, amount):
-        self.balance += amount
-        return self.balance
-
-    def go_to_jail(self):
-        self.jail_status = 3
-        self.position = 10
-
-    def out_of_jail(self):
-        self.jail_status = 0
-
-    def pass_turn(self):
-        self.jail_status -= 1
-
-    def get_name(self):
-        return self.name
-
-
-def roll():
+def roll() -> List[int]:
     """ roll 2 dice """
     die1 = randint(1, 6)
     die2 = randint(1, 6)
     sum_dice = sum((die1, die2))
     return die1, die2, sum_dice
+
+def grid2pos(values: List[Tuple[int, int]]) -> int:
+    """ List of board properties is basically a grid
+    
+    Args:
+        values (list of int)
+    Returns:
+        pos (int)    
+    """
+    
+    row, column = values
+    pos = (row * 10) + row + column
+    return pos
 
 
 def main():

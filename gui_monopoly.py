@@ -60,6 +60,11 @@ class MainWindow(QMainWindow):
                 error.showMessage("Can't have more than 6 players")
                 error.exec_()
                 return
+            elif nb_players <= 0:
+                error = QErrorMessage()
+                error.showMessage("Are you kinding me?")
+                error.exec_()
+                return
 
         except Exception as e:
             error = QErrorMessage()
@@ -92,6 +97,14 @@ class MainWindow(QMainWindow):
                 error.showMessage("Please give all players names")
                 error.exec_()
                 return
+            else:
+                names = [player.get_name() for player in players]
+                
+                if name in names:
+                    error = QErrorMessage()
+                    error.showMessage("2 players can't have the same name")
+                    error.exec_()
+                    return
 
             players[Player(name)] = color
 
@@ -111,7 +124,7 @@ class TitleScreen(QWidget):
         nb_players_layout = QGridLayout()
         button_layout = QHBoxLayout()
 
-        description = QLabel("Hallo, this is my Monopoly GUI game")
+        description = QLabel("Hallo, this is my Monopoly GUI game. 6 players max plz")
         label = QLabel("How many players? :")
         self.nb_players = QLineEdit()
         self.start_game = QPushButton("Start game")
@@ -163,7 +176,7 @@ class NamesPlayers(QWidget):
 
         self.setLayout(main_layout)
 
-    def open_colordialog(self, button: QPushButton):
+    def open_colordialog(self, button):
         """ Open color dialog to get color for token
         
         Args:

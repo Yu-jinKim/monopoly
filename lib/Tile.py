@@ -5,8 +5,10 @@ from PyQt5.QtWidgets import (
     QGraphicsWidget,
     QGraphicsLinearLayout,
     QGraphicsTextItem,
+    QGraphicsRectItem,
 )
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QBrush, QColor
 
 import core
 import Board
@@ -17,8 +19,8 @@ import Token
 class Tile(QGraphicsWidget):
     """ Tile class """
 
-    def __init__(self, name, board_pos, price, rent,
-                       mortgage, players, parent
+    def __init__(self, name, board_pos, price,
+                 rent, mortgage, players, parent
     ):
         super().__init__(parent=parent)
         self.name = name
@@ -31,18 +33,21 @@ class Tile(QGraphicsWidget):
 
         self.layout = QGraphicsLinearLayout()
         self.token_layout = QGraphicsGridLayout()
-        self.token_layout.setSpacing(0.5)
 
+        self.color_property = QGraphicsWidget()
         self.name_on_tile = QGraphicsWidget()
         self.info = QGraphicsWidget()
 
         self.layout.setOrientation(Qt.Vertical)
-        self.setContentsMargins(75, 0, 90, 0)
+
 
         property_name = QGraphicsTextItem(self.name, parent=self.name_on_tile)
         
         if name in parent.properties:
             if self.board_pos in core.PROPERTIES:
+                if "Color" in core.PROPERTIES[self.board_pos][name]:
+                    color_property = self.color_tile(core.PROPERTIES[self.board_pos][name]["Color"])
+    
                 money_info = QGraphicsTextItem(f"Price: {self.price}", parent=self.info)
 
             elif self.board_pos in core.SPECIAL_CASES:
@@ -58,13 +63,18 @@ class Tile(QGraphicsWidget):
 
                 elif name in ["Income Tax", "Super Tax"]:
                     money_tax = QGraphicsTextItem(f"Tax: -{self.price}", parent=self.info)
+            
+        self.token_layout.setColumnMaximumWidth(0, 22)
+        self.token_layout.setColumnMaximumWidth(1, 22)
+        self.token_layout.setColumnMaximumWidth(2, 22)
+        self.token_layout.setSpacing(1)
 
+        self.layout.addItem(self.color_property)
         self.layout.addItem(self.name_on_tile)
         self.layout.addItem(self.info)
         self.layout.addItem(self.token_layout)
         self.setLayout(self.layout)
-
-        self.layout.setAlignment(self.layout, Qt.AlignCenter)
+        self.setContentsMargins(0, 0, 100, 0)
 
     def is_owned(self) -> bool:
         if self.owner:
@@ -146,6 +156,13 @@ class Tile(QGraphicsWidget):
 
     def paint(self, painter, option, widget):
         painter.drawRects(self.boundingRect())
+
+    def color_tile(self, color):
+        set_color = QColor()
+        set_color.setNamedColor(color)
+        color_rect = QGraphicsRectItem(0, 0, 150, 25, parent=self.color_property)
+        color_rect.setBrush(QBrush(set_color, style = Qt.SolidPattern))
+        return color_rect
 
 
 def main():

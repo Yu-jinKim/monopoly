@@ -9,7 +9,7 @@ PROPERTIES = {
     8: {"Euston Road": {"Rent": 6, "Price": 100, "Color": "#00ffff"}},
     9: {"Pentonville Road": {"Rent": 8, "Price": 120, "Color": "#00ffff"}},
     11: {"Pall Mall": {"Rent": 10, "Price": 140, "Color": "#6d0075"}},
-    12: {"Electric Company": {"Rent": 1, "Price": 150}},
+    12: {"Electric Company": {"Rent": 1, "Price": 150, "Color": "#FFFFFF"}},
     13: {"Whitehall": {"Rent": 10, "Price": 140, "Color": "#6d0075"}},
     14: {"Northumberland Avenue": {"Rent": 12, "Price": 160, "Color": "#6d0075"}},
     15: {"Marylebine station": {"Rent": 25, "Price": 200, "Color": "#000000"}},
@@ -22,7 +22,7 @@ PROPERTIES = {
     25: {"Fenchurch Street station": {"Rent": 25, "Price": 200, "Color": "#000000"}},
     26: {"Leicester Square": {"Rent": 22, "Price": 260, "Color": "#e5c100"}},
     27: {"Coventry Street": {"Rent": 22, "Price": 260, "Color": "#e5c100"}},
-    28: {"Water Works": {"Rent": 1, "Price": 150}},
+    28: {"Water Works": {"Rent": 1, "Price": 150, "Color": "#FFFFFF"}},
     29: {"Piccadilly": {"Rent": 24, "Price": 280, "Color": "#e5c100"}},
     31: {"Regent Street": {"Rent": 26, "Price": 300, "Color": "#007e00"}},
     32: {"Oxford Street": {"Rent": 26, "Price": 300, "Color": "#007e00"}},
@@ -30,6 +30,19 @@ PROPERTIES = {
     35: {"Liverpool Street station": {"Rent": 25, "Price": 200, "Color": "#000000"}},
     37: {"Park Lane": {"Rent": 35, "Price": 350, "Color": "#000062"}},
     39: {"Mayfair": {"Rent": 50, "Price": 400, "Color": "#000062"}}
+}
+
+COLOR2GROUP = {
+    "#fe0090": {"Name": "Rose-ish", "Number": 2},
+    "#00ffff": {"Name": "Cyan", "Number": 3},
+    "#6d0075": {"Name": "Purple-ish", "Number": 3},
+    "#ff6700": {"Name": "Orange", "Number": 3},
+    "#ff0000": {"Name": "Red", "Number": 3},
+    "#e5c100": {"Name": "Yellow", "Number": 3},
+    "#007e00": {"Name": "Green", "Number": 3},
+    "#000062": {"Name": "DarkBlue", "Number": 2},
+    "#000000": {"Name": "Stations", "Number": 4},
+    "#FFFFFF": {"Name": "Utilities", "Number": 2}
 }
 
 SPECIAL_CASES = {

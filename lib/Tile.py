@@ -20,7 +20,8 @@ class Tile(QGraphicsWidget):
     """ Tile class """
 
     def __init__(self, name, board_pos, price,
-                 rent, mortgage, players, parent
+                 rent, mortgage, players, color,
+                 group_name, number,parent,
     ):
         super().__init__(parent=parent)
         self.name = name
@@ -28,6 +29,9 @@ class Tile(QGraphicsWidget):
         self.price = price
         self.rent =  rent
         self.mortgage = mortgage
+        self.color = color
+        self.group_name = group_name
+        self.number = number
         self.tokens = []
         self.owner = False
 
@@ -40,15 +44,12 @@ class Tile(QGraphicsWidget):
 
         self.layout.setOrientation(Qt.Vertical)
 
-
         property_name = QGraphicsTextItem(self.name, parent=self.name_on_tile)
         
         if name in parent.properties:
             if self.board_pos in core.PROPERTIES:
-                if "Color" in core.PROPERTIES[self.board_pos][name]:
-                    color_property = self.color_tile(core.PROPERTIES[self.board_pos][name]["Color"])
-    
                 money_info = QGraphicsTextItem(f"Price: {self.price}", parent=self.info)
+                color_property = self.color_tile(color)
 
             elif self.board_pos in core.SPECIAL_CASES:
                 if name == "Start":
@@ -124,6 +125,12 @@ class Tile(QGraphicsWidget):
     
     def get_mortgage(self):
         return self.mortgage
+
+    def get_color(self):
+        return self.color
+
+    def get_group(self):
+        return self.group_name
 
     def has_tokens(self):
         if self.tokens != []:

@@ -66,22 +66,28 @@ class Board(QGraphicsWidget):
                 price = core.PROPERTIES[board_pos][name]["Price"]
                 rent = core.PROPERTIES[board_pos][name]["Rent"]
                 mortgage = price / 2
-            
+                color_property = core.PROPERTIES[board_pos][name]["Color"]
+                group = core.COLOR2GROUP[color_property]["Name"]
+                number = core.COLOR2GROUP[color_property]["Number"]
+
             elif board_pos in core.SPECIAL_CASES:
                 price = core.SPECIAL_CASES[board_pos][name]
                 rent, mortgage = None, None
+                color_property, group, number = None, None, None
 
             elif board_pos in core.CHANCES or board_pos in core.COMMUNITY_CHESTS:
                 price, rent, mortgage = None, None, None
+                color_property, group, number = None, None, None
 
             self.board_layout.addItem(
                 Tile.Tile(
                     name,
                     board_pos,
-                    price,
-                    rent,
-                    mortgage,
+                    price, rent, mortgage,
                     players,
+                    color_property,
+                    group,
+                    number,
                     parent=self
                     ),
                 *position

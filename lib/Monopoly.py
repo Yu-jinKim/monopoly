@@ -2,23 +2,25 @@ import sys
 import time
 
 from PyQt5.QtWidgets import (
-    QLineEdit,
-    QWidget,
     QApplication,
-    QLabel,
-    QGridLayout,
-    QGroupBox,
     QCheckBox,
     QDialog,
-    QPushButton,
-    QVBoxLayout,
-    QHBoxLayout,
+    QGridLayout,
+    QGroupBox,
+    QLabel,
+    QLineEdit,
     QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QWidget,
+    QHBoxLayout,
+    QVBoxLayout,
     QGraphicsScene,
     QGraphicsView,
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QBrush, QColor
 
 import core
 import Board
@@ -65,7 +67,7 @@ class Monopoly(QWidget):
         self.position_info = QLabel()
         self.position = QLabel()
         self.possessions_info = QLabel()
-        self.possessions = QLabel()
+        self.possessions = QTableWidget()
         roll_button = QPushButton("Roll")
 
         self.view = QGraphicsView()
@@ -74,6 +76,8 @@ class Monopoly(QWidget):
         self.board.setParent(self)
         self.scene.addItem(self.board)
         self.view.setScene(self.scene)
+
+        self.possessions.setContentsMargins(0, 0, 50, 50)
 
         self.pass_player_turn()
         self.update_interface()
@@ -140,8 +144,35 @@ class Monopoly(QWidget):
         self.position.setText(f"{tile.get_name()}")
 
     def update_possessions(self):
+        possessions = self.current_player.get_possessions()
+        tiles = [self.board.get_tile(prop) for prop in possessions]
+        sorted_tiles = sorted(tiles, key = lambda x: x.get_price())
+
         self.possessions_info.setText("You have these properties:")
-        self.possessions.setText(f"{self.current_player.get_possessions()}")
+
+        if sorted_tiles != []:
+            color2tiles = {}
+
+            for tile in sorted_tiles:
+                color2tiles.setdefault(tile.get_color(), []).append(tile)
+
+            self.possessions.setColumnCount(len(color2tiles))
+            self.possessions.setRowCount(max((len(v) for k, v in color2tiles.items())))
+
+            for column, (color, tiles) in enumerate(color2tiles.items()):
+                for row, tile in enumerate(tiles):
+                    set_color = QColor()
+                    set_color.setNamedColor(color)
+                    cell = QTableWidgetItem()
+                    cell.setBackground(QBrush(set_color, style = Qt.SolidPattern))
+                    
+                    if color == "#000000":
+                        cell.setText(f"{tile.get_name()}")
+                        cell.setForeground(QBrush(QColor(255, 255, 255)))
+                    else:
+                        cell.setText(f"{tile.get_name()}")
+
+                    self.possessions.setItem(row, column, cell)
 
     def update_interface(self):
         """ Call all update around the board display methods """

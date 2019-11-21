@@ -52,6 +52,15 @@ class Board(QGraphicsWidget):
             116: 4, 117: 3, 118: 2, 119: 1, 120: 0
         }
 
+        self.house2multiplier = {
+            1: 5,
+            2: 15,
+            3: 45,
+            4: 80,
+        }
+
+        self.hotel_multiplier = 125
+
         positions = [(i, j) for i in range(11) for j in range(11)]
 
         for position, name in zip(positions, self.properties):
@@ -67,16 +76,19 @@ class Board(QGraphicsWidget):
                 rent = core.PROPERTIES[board_pos][name]["Rent"]
                 mortgage = price / 2
                 color_property = core.PROPERTIES[board_pos][name]["Color"]
-                group = core.COLOR2GROUP[color_property]["Name"]
-                number = core.COLOR2GROUP[color_property]["Number"]
+                group = core.COLOR2GROUP_INFO[color_property]["Name"]
+                number = core.COLOR2GROUP_INFO[color_property]["Number"]
+                house_price = core.COLOR2GROUP_INFO[color_property]["House price"]
 
             elif board_pos in core.SPECIAL_CASES:
                 price = core.SPECIAL_CASES[board_pos][name]
                 rent, mortgage = None, None
+                house_price = None
                 color_property, group, number = None, None, None
 
             elif board_pos in core.CHANCES or board_pos in core.COMMUNITY_CHESTS:
                 price, rent, mortgage = None, None, None
+                house_price = None
                 color_property, group, number = None, None, None
 
             self.board_layout.addItem(
@@ -88,6 +100,7 @@ class Board(QGraphicsWidget):
                     color_property,
                     group,
                     number,
+                    house_price,
                     parent=self
                     ),
                 *position

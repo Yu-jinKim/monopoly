@@ -32,17 +32,17 @@ PROPERTIES = {
     39: {"Mayfair": {"Rent": 50, "Price": 400, "Color": "#000062"}}
 }
 
-COLOR2GROUP = {
-    "#fe0090": {"Name": "Rose-ish", "Number": 2},
-    "#00ffff": {"Name": "Cyan", "Number": 3},
-    "#6d0075": {"Name": "Purple-ish", "Number": 3},
-    "#ff6700": {"Name": "Orange", "Number": 3},
-    "#ff0000": {"Name": "Red", "Number": 3},
-    "#e5c100": {"Name": "Yellow", "Number": 3},
-    "#007e00": {"Name": "Green", "Number": 3},
-    "#000062": {"Name": "DarkBlue", "Number": 2},
-    "#000000": {"Name": "Stations", "Number": 4},
-    "#FFFFFF": {"Name": "Utilities", "Number": 2}
+COLOR2GROUP_INFO = {
+    "#fe0090": {"Name": "Rose-ish", "Number": 2, "House price": 50},
+    "#00ffff": {"Name": "Cyan", "Number": 3, "House price": 50},
+    "#6d0075": {"Name": "Purple-ish", "Number": 3, "House price": 100},
+    "#ff6700": {"Name": "Orange", "Number": 3, "House price": 100},
+    "#ff0000": {"Name": "Red", "Number": 3, "House price": 150},
+    "#e5c100": {"Name": "Yellow", "Number": 3, "House price": 150},
+    "#007e00": {"Name": "Green", "Number": 3, "House price": 200},
+    "#000062": {"Name": "DarkBlue", "Number": 2, "House price": 200},
+    "#000000": {"Name": "Stations", "Number": 4, "House price": None},
+    "#FFFFFF": {"Name": "Utilities", "Number": 2, "House price": None}
 }
 
 SPECIAL_CASES = {

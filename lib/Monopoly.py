@@ -1,9 +1,11 @@
+from functools import partial
 import sys
 import time
 
 from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,
+    QComboBox,
     QDialog,
     QGridLayout,
     QGroupBox,
@@ -144,35 +146,52 @@ class Monopoly(QWidget):
         self.position.setText(f"{tile.get_name()}")
 
     def update_possessions(self):
-        possessions = self.current_player.get_possessions()
-        tiles = [self.board.get_tile(prop) for prop in possessions]
-        sorted_tiles = sorted(tiles, key = lambda x: x.get_price())
+        tiles = self.current_player.get_possessions()
 
-        self.possessions_info.setText("You have these properties:")
+        if tiles:
+            sorted_tiles = sorted(tiles, key = lambda x: x.get_price())
 
-        if sorted_tiles != []:
-            color2tiles = {}
+            self.possessions_info.setText("You have these properties:")
 
-            for tile in sorted_tiles:
-                color2tiles.setdefault(tile.get_color(), []).append(tile)
+            if sorted_tiles != []:
+                color2tiles = {}
 
-            self.possessions.setColumnCount(len(color2tiles))
-            self.possessions.setRowCount(max((len(v) for k, v in color2tiles.items())))
+                for tile in sorted_tiles:
+                    color2tiles.setdefault(tile.get_color(), []).append(tile)
 
-            for column, (color, tiles) in enumerate(color2tiles.items()):
-                for row, tile in enumerate(tiles):
-                    set_color = QColor()
-                    set_color.setNamedColor(color)
-                    cell = QTableWidgetItem()
-                    cell.setBackground(QBrush(set_color, style = Qt.SolidPattern))
-                    
-                    if color == "#000000":
+                self.possessions.setColumnCount(len(color2tiles))
+                self.possessions.setRowCount(max((len(v) for k, v in color2tiles.items())))
+
+                for column, (color, tiles) in enumerate(color2tiles.items()):
+                    for row, tile in enumerate(tiles):
+                        set_color = QColor()
+                        set_color.setNamedColor(color)
+                        cell = QTableWidgetItem()
+                        cell.setBackground(QBrush(set_color, style = Qt.SolidPattern))
+                        
+                        if color == "#000000":
+                            cell.setForeground(QBrush(QColor(255, 255, 255)))
+                        
                         cell.setText(f"{tile.get_name()}")
-                        cell.setForeground(QBrush(QColor(255, 255, 255)))
-                    else:
-                        cell.setText(f"{tile.get_name()}")
 
-                    self.possessions.setItem(row, column, cell)
+                        self.possessions.setItem(row, column, cell)
+        else:
+            self.possessions.clearContents()
+
+    def update_buttons(self, tile2houses):
+        house_eligible_tiles = [tile for tile, nb_houses in tile2houses.items() if nb_houses < 4]
+
+        if house_eligible_tiles:
+            buy_houses = QPushButton("Buy houses")
+            self.buttons_layout.addWidget(buy_houses)
+            buy_houses.clicked.connect(partial(self.add_houses_dialog, tile2houses))
+
+        hotel_eligible_tiles = [tile for tile, nb_houses in tile2houses.items() if nb_houses == 4]
+        
+        if hotel_eligible_tiles:
+            buy_hotel = QPushButton("Buy hotel")
+            self.buttons_layout.addWidget(buy_hotel)
+            buy_hotel.clicked.connect(partial(self.add_hotel_dialog, hotel_eligible_tiles))
 
     def update_interface(self):
         """ Call all update around the board display methods """
@@ -181,6 +200,116 @@ class Monopoly(QWidget):
         self.update_balance()
         self.update_position()
         self.update_possessions()
+
+        group2tiles = self.current_player.has_one_group()
+        tile2houses = {}
+
+        if group2tiles:
+            for tiles in group2tiles.values():
+                for tile in tiles:
+                    tile2houses[tile] = tile.get_nb_houses()
+
+            self.update_buttons(tile2houses)
+
+    def add_houses_dialog(self, tile2houses):
+        self.house_window = QDialog()
+
+        main_layout = QVBoxLayout()
+        tiles_layout = QGridLayout()
+        button_layout = QHBoxLayout()
+        
+        button = QPushButton("Buy")
+
+        for row, (tile, nb_houses) in enumerate(tile2houses.items()):
+            if nb_houses != 4:
+                nb_houses_to_add = QComboBox()
+                
+                for i in range(0, 4 - nb_houses + 1):
+                    nb_houses_to_add.addItem(f"{i}")
+
+                tiles_layout.addWidget(nb_houses_to_add, row, 0)
+                tile_label = QLabel(f"{tile.get_name()}")
+                tile_label.setStyleSheet(f"color: {tile.get_color()}")
+                tiles_layout.addWidget(tile_label, row, 1)
+
+        button_layout.addWidget(button)
+        main_layout.addLayout(tiles_layout)
+        main_layout.addLayout(button_layout)
+        self.house_window.setLayout(main_layout)
+
+        button.clicked.connect(partial(self.add_houses, tiles_layout))
+
+        self.house_window.exec_()
+
+    def add_houses(self, gridlayout):
+        nb_row = gridlayout.rowCount()
+        total_price = 0
+        tile2nb_house_to_add = {}
+
+        for row in range(nb_row):
+            nb_house_to_add = int(gridlayout.itemAtPosition(row, 0).widget().currentText())
+            tile_name = gridlayout.itemAtPosition(row, 1).widget().text()
+            tile = self.board.get_tile(tile_name)
+
+            tile2nb_house_to_add[tile] = nb_house_to_add
+            total_price += tile.get_house_price() * nb_house_to_add
+
+        if all(value == 0 for value in tile2nb_house_to_add.values()):
+            self.popup("You didn't pick any houses to add")
+
+        if total_price <= self.current_player.get_balance():
+            for tile, nb_houses in tile2nb_house_to_add.items():
+                tile.add_houses(nb_houses)
+                tile.display_houses()
+
+            self.house_window.done(0)
+        
+        else:
+            self.popup("You don't have enough money to pay")
+            
+    def add_hotel_dialog(self, hotel_eligible_tiles):
+        self.hotel_window = QDialog()
+
+        main_layout = QVBoxLayout()
+        tiles_layout = QVBoxLayout()
+        button_layout = QHBoxLayout()
+        
+        hotel_options = QGroupBox()
+        button = QPushButton("Buy")
+
+        for tile in hotel_eligible_tiles:
+            box = QCheckBox(f"{tile.get_name()}")
+            box.setStyleSheet(f"color: {tile.get_color()}")
+            tiles_layout.addWidget(box)
+
+        hotel_options.setLayout(tiles_layout)
+        button_layout.addWidget(button)
+        main_layout.addWidget(hotel_options)
+        main_layout.addLayout(button_layout)
+        self.hotel_window.setLayout(main_layout)
+
+        button.clicked.connect(partial(self.add_hotel, hotel_options))
+
+        self.hotel_window.exec_()
+
+    def add_hotel(self, groupbox):
+        boxes = groupbox.findChildren(QCheckBox)
+        hotel_price = 0
+        hotels_to_add = []
+
+        for box in boxes:
+            if box.checkState() == 2:
+                tile_name = box.text()
+                tile = self.board.get_tile(tile_name)
+                hotel_price += tile.get_house_price()
+                hotels_to_add.append(tile)
+
+        if hotel_price <= self.current_player.get_balance():
+            for tile in hotels_to_add:
+                tile.add_hotel()
+            self.hotel_window.done(0)
+        else:
+            self.popup("You don't have enough money to buy those hotels")
 
     def order_players(self):
         """ roll dices for players and order them
@@ -461,7 +590,7 @@ class Monopoly(QWidget):
                     self.ask.exec_()
                     
                     if buy == self.ask.Yes:
-                        self.current_player.add_possession(tile_name, price)
+                        self.current_player.add_possession(tile)
                         tile.set_owner(self.current_player)
                         message = f"You now have {tile_name} and {self.current_player.get_balance()}"
                         self.popup(message)
@@ -509,11 +638,10 @@ class Monopoly(QWidget):
         """
         
         real_estate = 0
-        player_properties_names = self.current_player.get_possessions()
+        player_properties = self.current_player.get_possessions()
 
-        for prop_name in player_properties_names:
-            prop_tile = self.board.get_tile(prop_name)
-            real_estate += prop_tile.get_mortgage()
+        for tile in player_properties:
+            real_estate += tile.get_mortgage()
 
         if real_estate < self.sum_to_pay:
             return True
@@ -523,12 +651,7 @@ class Monopoly(QWidget):
     def mortgaging(self):
         """ Propose all player properties for mortgaging (checkboxes) """
         
-        player_properties_names = self.current_player.get_possessions()
-        properties = []
-        self.chosen_mortgaged_properties = {}
-
-        for prop_name in player_properties_names:
-            properties.append(self.board.get_tile(prop_name))
+        properties = self.current_player.get_possessions()
 
         self.mortgaging_window = QDialog()
 
@@ -564,19 +687,20 @@ class Monopoly(QWidget):
 
         boxes = self.mortgage_options.findChildren(QCheckBox)
         mortgage_money = 0
+        chosen_mortgaged_properties = []
 
         for box in boxes:
             if box.checkState() == 2:
                 name, mortgage_worth = box.text().split("-")
                 mortgage_money += int(float(mortgage_worth))
-                self.chosen_mortgaged_properties[name] = mortgage_worth
+                chosen_mortgaged_properties.append(name)
 
         if mortgage_money >= self.sum_to_pay:
-            for name, worth in self.chosen_mortgaged_properties.items():
+            for name in chosen_mortgaged_properties:
                 tile = self.board.get_tile(name)
-                self.current_player.remove_possession(name, int(float(worth)))
+                self.current_player.remove_possession(tile)
                 tile.remove_owner()
-                self.mortgaging_window.done(0)
+            self.mortgaging_window.done(0)
         else:
             message = f"""
                 You didn't give enough properties to mortgage:

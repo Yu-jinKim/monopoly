@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QGraphicsRectItem,
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QBrush, QColor
+from PyQt5.QtGui import QBrush, QColor, QPen
 
 import core
 import Board
@@ -21,7 +21,8 @@ class Tile(QGraphicsWidget):
 
     def __init__(self, name, board_pos, price,
                  rent, mortgage, players, color,
-                 group_name, number,parent,
+                 group_name, number_in_group,
+                 house_price, parent,
     ):
         super().__init__(parent=parent)
         self.name = name
@@ -31,9 +32,12 @@ class Tile(QGraphicsWidget):
         self.mortgage = mortgage
         self.color = color
         self.group_name = group_name
-        self.number = number
+        self.number_in_group = number_in_group
         self.tokens = []
         self.owner = False
+        self.house_price = house_price
+        self.nb_houses = 0
+        self.hotel = False
 
         self.layout = QGraphicsLinearLayout()
         self.token_layout = QGraphicsGridLayout()
@@ -49,7 +53,7 @@ class Tile(QGraphicsWidget):
         if name in parent.properties:
             if self.board_pos in core.PROPERTIES:
                 money_info = QGraphicsTextItem(f"Price: {self.price}", parent=self.info)
-                color_property = self.color_tile(color)
+                self.color_rect = self.color_tile(color)
 
             elif self.board_pos in core.SPECIAL_CASES:
                 if name == "Start":
@@ -77,7 +81,7 @@ class Tile(QGraphicsWidget):
         self.setLayout(self.layout)
         self.setContentsMargins(0, 0, 100, 0)
 
-    def is_owned(self) -> bool:
+    def is_owned(self):
         if self.owner:
             return True
         else:
@@ -101,6 +105,15 @@ class Tile(QGraphicsWidget):
     def remove_token_layout(self, token):
         self.token_layout.removeItem(token)
 
+    def add_houses(self, number):
+        self.nb_houses += number
+        self.display_houses()
+
+    def add_hotel(self):
+        self.nb_houses = 0
+        self.hotel = True
+        self.display_hotel()
+
     def get_name(self):
         return self.name
 
@@ -121,7 +134,12 @@ class Tile(QGraphicsWidget):
         return self.price
 
     def get_rent(self):
-        return self.rent
+        if self.hotel:
+            return self.rent * self.parent().hotel_multiplier
+        elif self.nb_houses:
+            return self.rent * self.parent().house2mutliplier[self.nb_houses]
+        else:
+            return self.rent
     
     def get_mortgage(self):
         return self.mortgage
@@ -131,6 +149,15 @@ class Tile(QGraphicsWidget):
 
     def get_group(self):
         return self.group_name
+
+    def get_nb_houses(self):
+        return self.nb_houses
+
+    def get_house_price(self):
+        return self.house_price
+
+    def get_number_in_group(self):
+        return self.number_in_group
 
     def has_tokens(self):
         if self.tokens != []:
@@ -160,6 +187,36 @@ class Tile(QGraphicsWidget):
                     sub_pos += 1
             else:
                 self.token_layout.addItem(token, 0, i)
+
+    def display_houses(self):
+        for i in range(self.nb_houses):
+            width, height = self.color_rect.boundingRect().getRect()[2:]
+            set_color = QColor()
+            set_color.setNamedColor("#00FF00")
+            house = QGraphicsRectItem(width/4 * i + 5, height/4, width/4 - 10, height/2)
+            house.setParentItem(self.color_rect)
+            house.setBrush(QBrush(set_color, style = Qt.Dense1Pattern))
+
+    def display_hotel(self):
+        if self.hotel:
+            width, height = self.color_rect.boundingRect().getRect()[2:]
+            houses = self.color_rect.childItems()
+
+            for house in houses:
+                house.setParentItem(None)
+
+            rect_color = QColor()
+            rect_color.setNamedColor("#FF0000")
+            pen_color = QColor()
+            pen_color.setNamedColor("#00A500")
+            pen = QPen()
+            pen.setBrush(QBrush(pen_color))
+            pen.setWidth(2)
+
+            hotel = QGraphicsRectItem(width/4, height/4, width/2, height/2)
+            hotel.setParentItem(self.color_rect)
+            hotel.setBrush(QBrush(rect_color, style = Qt.Dense1Pattern))
+            hotel.setPen(pen)
 
     def paint(self, painter, option, widget):
         painter.drawRects(self.boundingRect())

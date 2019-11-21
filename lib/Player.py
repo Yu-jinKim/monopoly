@@ -1,8 +1,11 @@
+from collections import defaultdict
+
 class Player:
     def __init__(self, name):
         self.name = name
-        self.balance = 1500
+        self.balance = 200
         self.possessions = []
+        self.group_possessions = defaultdict(lambda: 0)
         self.jail_status = 0
 
     def __str__(self):
@@ -20,13 +23,26 @@ class Player:
     def in_jail(self):
         return self.jail_status
 
-    def add_possession(self, land, amount):
-        self.balance -= amount
-        self.possessions.append(land)
+    def add_possession(self, tile):
+        self.balance -= tile.get_price()
+        self.possessions.append(tile)
+        self.group_possessions[tile.get_group()] += 1
 
-    def remove_possession(self, land, amount):
-        self.balance += amount
-        self.possessions.remove(land)
+    def remove_possession(self, tile):
+        self.balance += tile.get_mortgage()
+        self.possessions.remove(tile)
+        self.group_possessions[tile.get_group()] -= 1
+
+    def has_one_group(self):
+        group2tiles = {}
+
+        for prop in self.possessions:
+            group = prop.get_group()
+
+            if prop.get_number_in_group() == self.group_possessions[group]:
+                group2tiles.setdefault(group, []).append(prop)
+
+        return group2tiles
 
     def pay(self, amount):
         self.balance -= amount
